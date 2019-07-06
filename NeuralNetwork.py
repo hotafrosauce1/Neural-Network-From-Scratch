@@ -33,6 +33,11 @@ class Network:
         self.weights = np.array(self.weights)
         self.bias = np.array(self.bias)
 
+    def predict(self, x):
+        output_activation = self.feedforward(x, is_prediction = True)
+        print(output_activation)
+
+
     def train(self, X, y, lr = 0.01, batch_size = 100, epochs = 10):
         #w = w - lr/m * sum{from 1 to m} ()
         self.create_class_mapping(y)
@@ -57,14 +62,12 @@ class Network:
             mapped_outputs = np.array(list(map(lambda x: self.class_map[x], training_batch_y)))
             mapped_y = np_utils.to_categorical(mapped_outputs, num_classes = self.num_classes)
 
-            epoch_sum = 0
-
             for (x_train_example, y_train_example) in zip(training_batch_X, mapped_y):
                 activations, weighted_inputs = self.feedforward(x_train_example)
                 errors = self.backpropagation(y_train_example, activations, weighted_inputs)
-                self.update_weights(activations, errors)
+                return self.update_weights(activations, errors)
 
-    def feedforward(self, input):
+    def feedforward(self, input, is_prediction = False):
         activations = []
         weighted_inputs = []
         for (layer_index, neurons) in enumerate(self.layers):
@@ -76,7 +79,11 @@ class Network:
                 weighted_input = np.dot(self.weights[layer_index], activations[layer_index - 1]) + self.bias[layer_index]
                 activations.append(sigmoid(weighted_input))
                 weighted_inputs.append(weighted_input)
-        return activations, weighted_inputs
+
+        if is_prediction:
+            return activations[-1]
+        else:
+            return activations, weighted_inputs
 
     def backpropagation(self, y, activations, weighted_inputs):
         errors = {}
@@ -100,9 +107,13 @@ class Network:
             # for weight_matrix_row in range(self.layers[layer_index]):
             error_layer = len(errors[layer_index])
             layer_l_minus_1_neuron_count = self.layers[layer_index - 1]
-            dC_dw = np.array([[activations[layer_index - 1][row] * errors[layer_index][col] for col in range(error_layer)] for row in range(layer_l_minus_1_neuron_count)])
-            print(dC_dw)
-            print()
+            dC_dw = np.array([[activations[layer_index - 1][row] * errors[layer_index][col]
+            for col in range(error_layer)]
+            for row in range(layer_l_minus_1_neuron_count)])
+            dC_db = errors[layer_index]
+            self.weights[layer_index] -= dC_dw.T
+            self.bias[layer_index] -= dC_db
+
 
     def create_class_mapping(self, y):
         class_map = {}
@@ -116,7 +127,50 @@ class Network:
         self.class_map = class_map
 
 n = Network([3,2,3,3])
-a = np.array([[1,2,3] for _ in range(3)])
-b = np.array([4,1,0])
-print(n.weights)
-# x = n.train(a,b)
+
+a = np.array([[1,2,3],
+              [1,2,3],
+              [1,2,3],
+              [1,2,3],
+              [1,2,3],
+              [1,2,3],
+              [1,2,3],
+              [1,2,3],
+              [1,2,3],
+              [1,2,3],
+              [1,2,3],
+              [1,2,3],
+              [1,2,3],
+              [4,5,6],
+              [4,5,6],
+              [4,5,6],
+              [4,5,6],
+              [4,5,6],
+              [4,5,6],
+              [4,5,6],
+              [4,5,6],
+              [4,5,6],
+              [4,5,6],
+              [4,5,6],
+              [4,5,6],
+              [4,5,6],
+              [7,8,9],
+              [7,8,9],
+              [7,8,9],
+              [7,8,9],
+              [7,8,9],
+              [7,8,9],
+              [7,8,9],
+              [7,8,9],
+              [7,8,9],
+              [7,8,9],
+              [7,8,9],
+              [7,8,9],
+              [7,8,9],
+              [7,8,9]
+              ])
+
+b = np.array([4,4,4,4,4,4,4,4,4,4,4,4,4,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
+x = n.train(a,b)
+
+n.predict(np.array([4,5,6]))
