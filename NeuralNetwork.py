@@ -24,12 +24,12 @@ class Network:
         for (layer_index, neurons) in enumerate(layers):
             if layer_index == 0:
                 self.weights.append(np.random.randn(neurons))
-                self.bias.append(np.zeros(neurons))
+                self.bias.append(np.zeros(neurons).reshape((neurons,1)))
                 prev_layer_neurons = neurons
                 continue
             else:
                 self.weights.append(np.array([np.random.randn(prev_layer_neurons) for _ in range(neurons)]))
-                self.bias.append(np.random.randn(neurons))
+                self.bias.append(np.random.randn(neurons).reshape((neurons,1)))
                 prev_layer_neurons = neurons
 
         self.weights = np.array(self.weights)
@@ -86,10 +86,10 @@ class Network:
         weighted_inputs = []
         for (layer_index, neurons) in enumerate(self.layers):
             if layer_index == 0:
-                weighted_input = self.weights[0] * input
+                input_weights_shape = self.weights[0].shape
+                weighted_input = self.weights[0].reshape((input_weights_shape[0], 1)) * input
                 activations.append(sigmoid(weighted_input))
                 weighted_inputs.append(weighted_input)
-                print("weights: ", self.weights[0].shape, "input: ", input.shape)
             else:
                 weighted_input = np.dot(self.weights[layer_index], activations[layer_index - 1]) + self.bias[layer_index]
                 activations.append(sigmoid(weighted_input))
@@ -126,6 +126,10 @@ class Network:
             for col in range(error_layer)]
             for row in range(layer_l_minus_1_neuron_count)])
             dC_db = errors[layer_index]
+
+            print("layer index: ", layer_index)
+            print(self.weights[layer_index].shape, dC_dw.T.shape)
+
             self.weights[layer_index] -= dC_dw.T
             self.bias[layer_index] -= dC_db
 
