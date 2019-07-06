@@ -1,4 +1,5 @@
 import numpy as np
+import keras
 from keras.utils import np_utils
 
 def sigmoid(z):
@@ -17,6 +18,7 @@ class Network:
         self.layers = layers
         self.num_classes = layers[-1]
         self.class_map = {}
+        self.inverse_map = {}
 
         prev_layer_neurons = None
         for (layer_index, neurons) in enumerate(layers):
@@ -35,39 +37,51 @@ class Network:
 
     def predict(self, x):
         output_activation = self.feedforward(x, is_prediction = True)
-        print(output_activation)
+        prediction_index = np.argmax(output_activation)
+        print(self.class_map)
+        print(self.class_map[prediction_index])
 
 
-    def train(self, X, y, lr = 0.01, batch_size = 100, epochs = 10):
+    def train(self, X, y, lr = 0.01, batch_size = 100, epochs = 100):
         #w = w - lr/m * sum{from 1 to m} ()
+        assert len(X[0]) == self.layers[0]
+
         self.create_class_mapping(y)
 
         activations = [np.array([])]
         true_batch = min(batch_size, len(X))
         if true_batch < 100:
             batch_size = true_batch
-        for epoch in range(epochs):
-            y = np.reshape(y, (len(y), 1))
-            X_and_y = np.concatenate((X,y), axis = 1)
 
-            num_cols = len(X_and_y[0])
+        for epoch in range(epochs):
+            holder = [(X[row], y[row]) for row in range(batch_size)]
+
+            y = np.reshape(y, (len(y), 1))
+            X_and_y = np.array(holder)
+
             np.random.shuffle(X_and_y)
 
-            X = X_and_y[:,:num_cols - 1]
-            y = X_and_y[:, num_cols - 1]
+            X = [X_and_y[i][0] for i in range(batch_size)]
+            y = [X_and_y[i][1] for i in range(batch_size)]
 
             training_batch_X = X[:batch_size]
             training_batch_y = y[:batch_size]
 
-            mapped_outputs = np.array(list(map(lambda x: self.class_map[x], training_batch_y)))
+            mapped_outputs = np.array(list(map(lambda x: self.inverse_map[x], training_batch_y)))
             mapped_y = np_utils.to_categorical(mapped_outputs, num_classes = self.num_classes)
 
+            error = 0
             for (x_train_example, y_train_example) in zip(training_batch_X, mapped_y):
                 activations, weighted_inputs = self.feedforward(x_train_example)
                 errors = self.backpropagation(y_train_example, activations, weighted_inputs)
-                return self.update_weights(activations, errors)
+                self.update_weights(activations, errors)
+
+                error += (np.linalg.norm((activations[-1] - y_train_example))) ** 2
+
+            print("Epoch: {}, Error: {}".format(epoch, error))
 
     def feedforward(self, input, is_prediction = False):
+        input = input.reshape((input.shape[0] * input.shape[1], 1))
         activations = []
         weighted_inputs = []
         for (layer_index, neurons) in enumerate(self.layers):
@@ -75,6 +89,7 @@ class Network:
                 weighted_input = self.weights[0] * input
                 activations.append(sigmoid(weighted_input))
                 weighted_inputs.append(weighted_input)
+                print("weights: ", self.weights[0].shape, "input: ", input.shape)
             else:
                 weighted_input = np.dot(self.weights[layer_index], activations[layer_index - 1]) + self.bias[layer_index]
                 activations.append(sigmoid(weighted_input))
@@ -117,60 +132,19 @@ class Network:
 
     def create_class_mapping(self, y):
         class_map = {}
+        inverse_map = {}
         curr_class_num = 0
         for val in np.unique(y):
-            if val in class_map.keys():
+            if val in class_map.keys() and val in inverse_map.keys():
                 continue
             else:
-                class_map[val] = curr_class_num
+                class_map[curr_class_num] = val
+                inverse_map[val] = curr_class_num
                 curr_class_num += 1
         self.class_map = class_map
+        self.inverse_map = inverse_map
 
-n = Network([3,2,3,3])
-
-a = np.array([[1,2,3],
-              [1,2,3],
-              [1,2,3],
-              [1,2,3],
-              [1,2,3],
-              [1,2,3],
-              [1,2,3],
-              [1,2,3],
-              [1,2,3],
-              [1,2,3],
-              [1,2,3],
-              [1,2,3],
-              [1,2,3],
-              [4,5,6],
-              [4,5,6],
-              [4,5,6],
-              [4,5,6],
-              [4,5,6],
-              [4,5,6],
-              [4,5,6],
-              [4,5,6],
-              [4,5,6],
-              [4,5,6],
-              [4,5,6],
-              [4,5,6],
-              [4,5,6],
-              [7,8,9],
-              [7,8,9],
-              [7,8,9],
-              [7,8,9],
-              [7,8,9],
-              [7,8,9],
-              [7,8,9],
-              [7,8,9],
-              [7,8,9],
-              [7,8,9],
-              [7,8,9],
-              [7,8,9],
-              [7,8,9],
-              [7,8,9]
-              ])
-
-b = np.array([4,4,4,4,4,4,4,4,4,4,4,4,4,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
-x = n.train(a,b)
-
-n.predict(np.array([4,5,6]))
+n = Network([784,1,10])
+(X_train, y_train), (X_test, y_test) = keras.datasets.mnist.load_data()
+X_train = list(map(lambda x: x.reshape((784, 1)), X_train))
+n.train(X_train, y_train, batch_size = 300, epochs = 1)
