@@ -1,7 +1,7 @@
 import numpy as np
 import keras
 from keras.utils import np_utils
-from sklearn.preprocessing import normalize
+from sklearn.preprocessing import scale
 
 def sigmoid(z):
     return 1 / (1 + np.exp(-z))
@@ -40,37 +40,45 @@ class Network:
         prediction_index = np.argmax(output_activation)
         return self.class_map[prediction_index], output_activation
 
-    def train(self, X, y, lr = 0.01, batch_size = 100, epochs = 100):
-        #w = w - lr/m * sum{from 1 to m} ()
-        assert len(X[0]) == self.layers[0]
+    def evaluate(self, X_test, y_test):
+        test_size = len(X_test)
+        preds = [1 if (self.class_map[self.predict(X_test[i])[0]] == y_test[i]) else 0 for i in range(test_size)]
+        accuracy = sum(preds)
+        return "Accuracy: {}%".format(round(accuracy / test_size * 100, 2))
 
-        self.create_class_mapping(y)
+    def train(self, X_train, y_train, X_test = None, y_test = None, lr = 0.01, batch_size = 100, epochs = 100):
+        assert len(X_train[0]) == self.layers[0]
 
-        X_len = len(X)
+        self.create_class_mapping(y_train)
+
+        X_len = len(X_train)
         true_batch = min(batch_size, X_len)
         if true_batch < 100:
             batch_size = true_batch
 
         for epoch in range(epochs):
-            X_and_y = np.c_[X, y]
-
+            X_and_y = np.c_[X_train, y_train]
             np.random.shuffle(X_and_y)
 
-            training_batch_X = X_and_y[:batch_size,:-1]
-            training_batch_y = X_and_y[:batch_size,-1]
+            mini_batches = [X_and_y[i:i + batch_size] for i in range(0, len(X_and_y), batch_size)]
 
-            mapped_outputs = np.array(list(map(lambda x: self.inverse_map[x], training_batch_y)))
-            mapped_y = np_utils.to_categorical(mapped_outputs, num_classes = self.num_classes)
+            for batch in mini_batches:
+                for train_example in batch:
+                    x_train_example = train_example[:-1]
 
-            error = 0
-            for (x_train_example, y_train_example) in zip(training_batch_X, mapped_y):
-                activations, weighted_inputs = self.feedforward(x_train_example)
-                errors = self.backpropagation(y_train_example, activations, weighted_inputs)
-                self.update_weights(activations, errors, lr, batch_size)
+                    y_train_example = train_example[-1]
+                    mapped_y = self.inverse_map[y_train_example]
+                    categorized_y = np_utils.to_categorical(mapped_y, num_classes = self.num_classes)
 
-                error += (np.linalg.norm((activations[-1] - y_train_example))) ** 2
+                    activations, weighted_inputs = self.feedforward(x_train_example)
+                    bias_gradients, weight_gradients = self.backpropagation(categorized_y, activations, weighted_inputs)
 
-            print("Epoch: {}, Error: {}".format(epoch + 1, error))
+                    self.update_weights_and_biases(bias_gradients, weight_gradients, lr, batch_size)
+
+            if (X_test is None) and (y_test is None):
+                print("Epoch {}".format(epoch + 1))
+            else:
+                print("Epoch: {}, {}".format(epoch + 1, self.evaluate(X_test, y_test)))
 
     def feedforward(self, input, is_prediction = False):
         activations = []
@@ -94,33 +102,30 @@ class Network:
             return activations, weighted_inputs
 
     def backpropagation(self, y, activations, weighted_inputs):
-        errors = {}
+        bias_grad = {}
+        weight_grad = {}
         num_layers = len(self.layers)
+
         for layer_index in range(num_layers - 1, 0, -1):
             if layer_index == num_layers - 1:
                 gradient_cost = activations[layer_index] - y
-                errors[layer_index] = gradient_cost * sigmoid_prime(weighted_inputs[layer_index])
+                output_layer_error = gradient_cost * sigmoid_prime(weighted_inputs[layer_index])
+                bias_grad[layer_index] = output_layer_error
+                weight_grad[layer_index] = np.outer(output_layer_error, activations[layer_index - 1])
             else:
                 next_layer_weights_t = self.weights[layer_index + 1].T
-                next_layer_errors = errors[layer_index + 1]
+                next_layer_errors = bias_grad[layer_index + 1]
                 curr_layer_weighted_input = weighted_inputs[layer_index]
                 curr_layer_error = np.dot(next_layer_weights_t, next_layer_errors) * sigmoid_prime(curr_layer_weighted_input)
-                errors[layer_index] = curr_layer_error
-        return errors
+                bias_grad[layer_index] = curr_layer_error
+                weight_grad[layer_index] = np.outer(curr_layer_error, activations[layer_index - 1])
 
-    def update_weights(self, activations, errors, lr, batch_size):
+        return bias_grad, weight_grad
+
+    def update_weights_and_biases(self, bias_gradients, weight_gradients, lr, batch_size):
         for layer_index in range(1, len(self.layers)):
-            error_layer = len(errors[layer_index])
-            layer_l_minus_1_neuron_count = self.layers[layer_index - 1]
-
-            dC_dw = np.array([[activations[layer_index - 1][row] * errors[layer_index][col]
-            for col in range(error_layer)]
-            for row in range(layer_l_minus_1_neuron_count)])
-
-            dC_db = errors[layer_index]
-
-            self.weights[layer_index] -= (lr / batch_size * dC_dw.T)
-            self.bias[layer_index] -= (lr / batch_size * dC_db)
+            self.bias[layer_index] -= (lr / batch_size * bias_gradients[layer_index])
+            self.weights[layer_index] -= (lr / batch_size * weight_gradients[layer_index])
 
     def create_class_mapping(self, y):
         class_map = {}
@@ -136,21 +141,13 @@ class Network:
         self.class_map = class_map
         self.inverse_map = inverse_map
 
-n = Network([784,30,10,10])
+n = Network([784,100,30,10])
 (X_train, y_train), (X_test, y_test) = keras.datasets.mnist.load_data()
 
 X_train = list(map(lambda x: x.reshape((784,)), X_train))
-X_train = normalize(X_train)
+X_train = scale(X_train)
 
 X_test = list(map(lambda x: x.reshape((784,)), X_test))
-X_test = normalize(X_test)
+X_test = scale(X_test)
 
-n.train(X_train, y_train, batch_size = 100, epochs = 10, lr = 0.01)
-num_correct = 0
-for i in range(len(X_test)):
-    pred, activation = n.predict(X_test[i])
-    print("actual: ", y_test[i], "predicted: ", pred, "\n","activation: ", activation)
-    if pred == y_test[i]:
-        num_correct += 1
-accuracy = num_correct / len(X_test)
-print("accuracy: {}%".format(accuracy * 100))
+n.train(X_train, y_train, X_test = X_test, y_test = y_test, batch_size = 10, epochs = 10, lr = 0.1)
