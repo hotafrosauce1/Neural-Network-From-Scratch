@@ -46,7 +46,7 @@ class Network:
         accuracy = sum(preds)
         return "Accuracy: {}%".format(round(accuracy / test_size * 100, 2))
 
-    def train(self, X_train, y_train, X_test = None, y_test = None, lr = 0.01, batch_size = 100, epochs = 100):
+    def train(self, X_train, y_train, X_test = None, y_test = None, lr = 3, batch_size = 100, epochs = 100):
         assert len(X_train[0]) == self.layers[0]
 
         self.create_class_mapping(y_train)
@@ -141,7 +141,7 @@ class Network:
         self.class_map = class_map
         self.inverse_map = inverse_map
 
-n = Network([784,100,30,10])
+n = Network([784,30,10,10])
 (X_train, y_train), (X_test, y_test) = keras.datasets.mnist.load_data()
 
 X_train = list(map(lambda x: x.reshape((784,)), X_train))
@@ -150,4 +150,4 @@ X_train = scale(X_train)
 X_test = list(map(lambda x: x.reshape((784,)), X_test))
 X_test = scale(X_test)
 
-n.train(X_train, y_train, X_test = X_test, y_test = y_test, batch_size = 10, epochs = 10, lr = 0.1)
+n.train(X_train, y_train, X_test = X_test, y_test = y_test, batch_size = 32, epochs = 10, lr = 3)
