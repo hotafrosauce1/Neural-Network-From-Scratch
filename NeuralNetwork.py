@@ -10,7 +10,44 @@ def sigmoid_prime(z):
     sig = sigmoid(z)
     return sig * (1 - sig)
 
-class Network:
+class Regularization(object):
+    @staticmethod
+    def get(regularizaton_method):
+        return reg_methods[regularizaton_method]
+
+    @staticmethod
+    def L1(weights, lmbda):
+        return None
+
+    @staticmethod
+    def L2(weights, lmbda):
+        return lmbda * weights
+
+    @staticmethod
+    def Dropout(weights, lmbda):
+        return None
+
+    @staticmethod
+    def none(weights, lmbda):
+        return 0
+
+class CrossEntropy(object):
+
+    @staticmethod
+    def output_error(output_activation, y, weighted_input):
+        return output_activation - y
+
+class QuadraticError(object):
+
+    @staticmethod
+    def output_error(output_activation, y, weighted_input):
+        return (output_activation - y) * sigmoid_prime(weighted_input)
+
+
+class Network(object):
+
+    reg_methods = {'L1': None, 'L2': Regularization.L2, 'Dropout': None, 'None': Regularization.none}
+    cost_functions = {'cross-entropy': CrossEntropy.output_error, 'mse': QuadraticError.output_error}
 
     def __init__(self, layers):
         self.num_layers = len(layers)
@@ -40,13 +77,15 @@ class Network:
         prediction_index = np.argmax(output_activation)
         return self.class_map[prediction_index], output_activation
 
-    def evaluate(self, X_test, y_test):
+    def evaluate(self, X_data, y_data):
         test_size = len(X_test)
-        preds = [1 if (self.class_map[self.predict(X_test[i])[0]] == y_test[i]) else 0 for i in range(test_size)]
+        preds = [1 if (self.class_map[self.predict(X_data[i])[0]] == y_data[i]) else 0 for i in range(test_size)]
         accuracy = sum(preds)
         return "Accuracy: {}%".format(round(accuracy / test_size * 100, 2))
 
-    def train(self, X_train, y_train, X_test = None, y_test = None, lr = 3, batch_size = 100, epochs = 100):
+    def train(self, X_train, y_train, X_validate = None, y_validate = None,
+              lr = 3, batch_size = 100, epochs = 100, regularizaton_method = 'None',
+              lmbda = 3, cost_function = 'cross-entropy'):
         assert len(X_train[0]) == self.layers[0]
 
         self.create_class_mapping(y_train)
@@ -71,14 +110,16 @@ class Network:
                     categorized_y = np_utils.to_categorical(mapped_y, num_classes = self.num_classes)
 
                     activations, weighted_inputs = self.feedforward(x_train_example)
-                    bias_gradients, weight_gradients = self.backpropagation(categorized_y, activations, weighted_inputs)
+                    bias_gradients, weight_gradients = self.backpropagation(categorized_y, activations, weighted_inputs,
+                                                                            cost_function)
 
-                    self.update_weights_and_biases(bias_gradients, weight_gradients, lr, batch_size)
+                    self.update_weights_and_biases(bias_gradients, weight_gradients,
+                                                   lr, batch_size, regularizaton_method, lmbda)
 
-            if (X_test is None) and (y_test is None):
+            if (X_validate is None) and (y_validate is None):
                 print("Epoch {}".format(epoch + 1))
             else:
-                print("Epoch: {}, {}".format(epoch + 1, self.evaluate(X_test, y_test)))
+                print("Epoch: {}, {}".format(epoch + 1, self.evaluate(X_validate, y_validate)))
 
     def feedforward(self, input, is_prediction = False):
         activations = []
@@ -101,31 +142,32 @@ class Network:
         else:
             return activations, weighted_inputs
 
-    def backpropagation(self, y, activations, weighted_inputs):
+    def backpropagation(self, y, activations, weighted_inputs, cost_function):
         bias_grad = {}
         weight_grad = {}
         num_layers = len(self.layers)
 
         for layer_index in range(num_layers - 1, 0, -1):
             if layer_index == num_layers - 1:
-                gradient_cost = activations[layer_index] - y
-                output_layer_error = gradient_cost * sigmoid_prime(weighted_inputs[layer_index])
+                output_layer_error =  self.cost_functions[cost_function](activations[layer_index], y, weighted_inputs[layer_index])
                 bias_grad[layer_index] = output_layer_error
                 weight_grad[layer_index] = np.outer(output_layer_error, activations[layer_index - 1])
             else:
                 next_layer_weights_t = self.weights[layer_index + 1].T
                 next_layer_errors = bias_grad[layer_index + 1]
-                curr_layer_weighted_input = weighted_inputs[layer_index]
-                curr_layer_error = np.dot(next_layer_weights_t, next_layer_errors) * sigmoid_prime(curr_layer_weighted_input)
+                curr_layer_error = np.dot(next_layer_weights_t, next_layer_errors) * sigmoid_prime(weighted_inputs[layer_index])
                 bias_grad[layer_index] = curr_layer_error
                 weight_grad[layer_index] = np.outer(curr_layer_error, activations[layer_index - 1])
 
         return bias_grad, weight_grad
 
-    def update_weights_and_biases(self, bias_gradients, weight_gradients, lr, batch_size):
+    def update_weights_and_biases(self, bias_gradients, weight_gradients, lr, batch_size,
+                                  regularizaton_method, lmbda):
+        regularizaton_func = self.reg_methods[regularizaton_method]
         for layer_index in range(1, len(self.layers)):
+            regularization = regularizaton_func(self.weights[layer_index], lmbda)
             self.bias[layer_index] -= (lr / batch_size * bias_gradients[layer_index])
-            self.weights[layer_index] -= (lr / batch_size * weight_gradients[layer_index])
+            self.weights[layer_index] -= lr / batch_size * (weight_gradients[layer_index])
 
     def create_class_mapping(self, y):
         class_map = {}
@@ -141,7 +183,7 @@ class Network:
         self.class_map = class_map
         self.inverse_map = inverse_map
 
-n = Network([784,30,10,10])
+n = Network([784,100,10])
 (X_train, y_train), (X_test, y_test) = keras.datasets.mnist.load_data()
 
 X_train = list(map(lambda x: x.reshape((784,)), X_train))
@@ -150,4 +192,6 @@ X_train = scale(X_train)
 X_test = list(map(lambda x: x.reshape((784,)), X_test))
 X_test = scale(X_test)
 
-n.train(X_train, y_train, X_test = X_test, y_test = y_test, batch_size = 32, epochs = 10, lr = 3)
+n.train(X_train, y_train, X_validate = X_test, y_validate = y_test,
+ batch_size = 32, epochs = 30, lr = 0.1, cost_function = 'cross-entropy',
+ regularizaton_method = 'L2', lmbda = 5)
