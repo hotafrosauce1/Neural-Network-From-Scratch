@@ -17,7 +17,7 @@ class Regularization(object):
 
     @staticmethod
     def L1(weights, lmbda):
-        return None
+        return lmbda * np.nan_to_num(np.sign(weights))
 
     @staticmethod
     def L2(weights, lmbda):
@@ -46,7 +46,7 @@ class QuadraticError(object):
 
 class Network(object):
 
-    reg_methods = {'L1': None, 'L2': Regularization.L2, 'Dropout': None, 'None': Regularization.none}
+    reg_methods = {'L1': Regularization.L1, 'L2': Regularization.L2, 'Dropout': None, 'None': Regularization.none}
     cost_functions = {'cross-entropy': CrossEntropy.output_error, 'mse': QuadraticError.output_error}
 
     def __init__(self, layers):
@@ -61,11 +61,11 @@ class Network(object):
         prev_layer_neurons = None
         for (layer_index, neurons) in enumerate(layers):
             if layer_index == 0:
-                self.weights.append(np.ones(neurons))
+                self.weights.append(np.random.rand(neurons))
                 self.bias.append(np.zeros(neurons))
                 prev_layer_neurons = neurons
             else:
-                self.weights.append(np.array([np.random.randn(prev_layer_neurons) for _ in range(neurons)]))
+                self.weights.append(np.array([np.random.randn(prev_layer_neurons) / np.sqrt(prev_layer_neurons) for _ in range(neurons)]))
                 self.bias.append(np.random.rand(neurons))
                 prev_layer_neurons = neurons
 
@@ -77,16 +77,21 @@ class Network(object):
         prediction_index = np.argmax(output_activation)
         return self.class_map[prediction_index], output_activation
 
-    def evaluate(self, X_data, y_data):
-        test_size = len(X_test)
-        preds = [1 if (self.class_map[self.predict(X_data[i])[0]] == y_data[i]) else 0 for i in range(test_size)]
-        accuracy = sum(preds)
-        return "Accuracy: {}%".format(round(accuracy / test_size * 100, 2))
+    def evaluate(self, X_data, y_data, X_train, y_train):
+        val_size = len(X_data)
+        train_size = len(X_train)
+        preds_val = [1 if (self.class_map[self.predict(X_data[i])[0]] == y_data[i]) else 0 for i in range(val_size)]
+        preds_train = [1 if (self.class_map[self.predict(X_train[i])[0]] == y_train[i]) else 0 for i in range(train_size)]
+        val_accuracy = round(sum(preds_val) / val_size * 100, 2)
+        train_accuracy = round(sum(preds_train) / train_size * 100, 2)
+        return "Validation Accuracy: {}%, Training Accuracy: {}%".format(val_accuracy, train_accuracy)
 
     def train(self, X_train, y_train, X_validate = None, y_validate = None,
               lr = 3, batch_size = 100, epochs = 100, regularizaton_method = 'None',
-              lmbda = 3, cost_function = 'cross-entropy'):
+              lmbda = 0.1, cost_function = 'cross-entropy'):
         assert len(X_train[0]) == self.layers[0]
+
+        n = len(X_train)
 
         self.create_class_mapping(y_train)
 
@@ -104,7 +109,6 @@ class Network(object):
             for batch in mini_batches:
                 for train_example in batch:
                     x_train_example = train_example[:-1]
-
                     y_train_example = train_example[-1]
                     mapped_y = self.inverse_map[y_train_example]
                     categorized_y = np_utils.to_categorical(mapped_y, num_classes = self.num_classes)
@@ -114,12 +118,12 @@ class Network(object):
                                                                             cost_function)
 
                     self.update_weights_and_biases(bias_gradients, weight_gradients,
-                                                   lr, batch_size, regularizaton_method, lmbda)
+                                                   lr, batch_size, regularizaton_method, lmbda, n)
 
-            if (X_validate is None) and (y_validate is None):
+            if (X_validate is None) or (y_validate is None):
                 print("Epoch {}".format(epoch + 1))
             else:
-                print("Epoch: {}, {}".format(epoch + 1, self.evaluate(X_validate, y_validate)))
+                print("Epoch: {}, {}".format(epoch + 1, self.evaluate(X_validate, y_validate, X_train, y_train)))
 
     def feedforward(self, input, is_prediction = False):
         activations = []
@@ -162,12 +166,13 @@ class Network(object):
         return bias_grad, weight_grad
 
     def update_weights_and_biases(self, bias_gradients, weight_gradients, lr, batch_size,
-                                  regularizaton_method, lmbda):
-        regularizaton_func = self.reg_methods[regularizaton_method]
+                                  regularizaton_method, lmbda, n):
+        reg_method = self.reg_methods[regularizaton_method]
         for layer_index in range(1, len(self.layers)):
-            regularization = regularizaton_func(self.weights[layer_index], lmbda)
+            reg = reg_method(self.weights[layer_index], lmbda)
             self.bias[layer_index] -= (lr / batch_size * bias_gradients[layer_index])
-            self.weights[layer_index] -= lr / batch_size * (weight_gradients[layer_index])
+            self.weights[layer_index] -= (lr / batch_size * weight_gradients[layer_index]) - (lr / n * reg)
+
 
     def create_class_mapping(self, y):
         class_map = {}
@@ -185,7 +190,6 @@ class Network(object):
 
 n = Network([784,100,10])
 (X_train, y_train), (X_test, y_test) = keras.datasets.mnist.load_data()
-
 X_train = list(map(lambda x: x.reshape((784,)), X_train))
 X_train = scale(X_train)
 
@@ -193,5 +197,4 @@ X_test = list(map(lambda x: x.reshape((784,)), X_test))
 X_test = scale(X_test)
 
 n.train(X_train, y_train, X_validate = X_test, y_validate = y_test,
- batch_size = 32, epochs = 30, lr = 0.1, cost_function = 'cross-entropy',
- regularizaton_method = 'L2', lmbda = 5)
+ batch_size = 10, epochs = 30, lr = 0.25, cost_function = 'cross-entropy', regularizaton_method = 'L2', lmbda = 0.1)
