@@ -2,6 +2,9 @@ import numpy as np
 import keras
 from keras.utils import np_utils
 from sklearn.preprocessing import scale
+import json
+import random
+import sys
 
 def sigmoid(z):
     return 1 / (1 + np.exp(-z))
@@ -24,10 +27,6 @@ class Regularization(object):
         return lmbda * weights
 
     @staticmethod
-    def Dropout(weights, lmbda):
-        return None
-
-    @staticmethod
     def none(weights, lmbda):
         return 0
 
@@ -46,7 +45,7 @@ class QuadraticError(object):
 
 class Network(object):
 
-    reg_methods = {'L1': Regularization.L1, 'L2': Regularization.L2, 'Dropout': None, 'None': Regularization.none}
+    reg_methods = {'L1': Regularization.L1, 'L2': Regularization.L2, 'None': Regularization.none}
     cost_functions = {'cross-entropy': CrossEntropy.output_error, 'mse': QuadraticError.output_error}
 
     def __init__(self, layers):
@@ -72,6 +71,14 @@ class Network(object):
         self.weights = np.array(self.weights)
         self.bias = np.array(self.bias)
 
+    def save(self, filename):
+        """Save the neural network to the file ‘‘filename‘‘."""
+        data = {"weights": [w.tolist() for w in self.weights], "biases": [b.tolist() for b in self.bias]}
+        f = open(filename , "w")
+        json.dump(data, f)
+        f.close()
+
+
     def predict(self, x):
         output_activation = self.feedforward(x, is_prediction = True)
         prediction_index = np.argmax(output_activation)
@@ -80,8 +87,8 @@ class Network(object):
     def evaluate(self, X_data, y_data, X_train, y_train):
         val_size = len(X_data)
         train_size = len(X_train)
-        preds_val = [1 if (self.class_map[self.predict(X_data[i])[0]] == y_data[i]) else 0 for i in range(val_size)]
-        preds_train = [1 if (self.class_map[self.predict(X_train[i])[0]] == y_train[i]) else 0 for i in range(train_size)]
+        preds_val = [1 if (self.predict(X_data[i])[0] == y_data[i]) else 0 for i in range(val_size)]
+        preds_train = [1 if (self.predict(X_train[i])[0] == y_train[i]) else 0 for i in range(train_size)]
         val_accuracy = round(sum(preds_val) / val_size * 100, 2)
         train_accuracy = round(sum(preds_train) / train_size * 100, 2)
         return "Validation Accuracy: {}%, Training Accuracy: {}%".format(val_accuracy, train_accuracy)
@@ -101,6 +108,7 @@ class Network(object):
             batch_size = true_batch
 
         for epoch in range(epochs):
+
             X_and_y = np.c_[X_train, y_train]
             np.random.shuffle(X_and_y)
 
@@ -128,6 +136,8 @@ class Network(object):
     def feedforward(self, input, is_prediction = False):
         activations = []
         weighted_inputs = []
+        input = list(map(lambda x: int(x), input))
+
         for (layer_index, neurons) in enumerate(self.layers):
             if layer_index == 0:
                 weighted_input = self.weights[0] * input
@@ -197,4 +207,5 @@ X_test = list(map(lambda x: x.reshape((784,)), X_test))
 X_test = scale(X_test)
 
 n.train(X_train, y_train, X_validate = X_test, y_validate = y_test,
- batch_size = 10, epochs = 30, lr = 0.25, cost_function = 'cross-entropy', regularizaton_method = 'L2', lmbda = 0.1)
+ batch_size = 10, epochs = 10, lr = 0.25, cost_function = 'cross-entropy',
+  regularizaton_method = 'L2', lmbda = 0.1)
