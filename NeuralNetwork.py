@@ -1,10 +1,14 @@
 import numpy as np
 import keras
-from keras.utils import np_utils
-from sklearn.preprocessing import scale
 import json
 import random
 import sys
+
+from keras.utils import np_utils
+from sklearn.preprocessing import scale
+from Regularization import Regularization
+from Costs import CrossEntropy
+from Costs import QuadraticError
 
 def sigmoid(z):
     return 1 / (1 + np.exp(-z))
@@ -12,33 +16,6 @@ def sigmoid(z):
 def sigmoid_prime(z):
     sig = sigmoid(z)
     return sig * (1 - sig)
-
-class Regularization(object):
-    
-    @staticmethod
-    def L1(weights, lmbda):
-        return lmbda * np.nan_to_num(np.sign(weights))
-
-    @staticmethod
-    def L2(weights, lmbda):
-        return lmbda * weights
-
-    @staticmethod
-    def none(weights, lmbda):
-        return 0
-
-class CrossEntropy(object):
-
-    @staticmethod
-    def output_error(output_activation, y, weighted_input):
-        return output_activation - y
-
-class QuadraticError(object):
-
-    @staticmethod
-    def output_error(output_activation, y, weighted_input):
-        return (output_activation - y) * sigmoid_prime(weighted_input)
-
 
 class Network(object):
 
@@ -179,7 +156,6 @@ class Network(object):
             reg = reg_method(self.weights[layer_index], lmbda)
             self.bias[layer_index] -= (lr / batch_size * bias_gradients[layer_index])
             self.weights[layer_index] -= (lr / batch_size * weight_gradients[layer_index]) - (lr / n * reg)
-
 
     def create_class_mapping(self, y):
         class_map = {}
