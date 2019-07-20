@@ -14,10 +14,7 @@ def sigmoid_prime(z):
     return sig * (1 - sig)
 
 class Regularization(object):
-    @staticmethod
-    def get(regularizaton_method):
-        return reg_methods[regularizaton_method]
-
+    
     @staticmethod
     def L1(weights, lmbda):
         return lmbda * np.nan_to_num(np.sign(weights))
