@@ -18,7 +18,6 @@ def sigmoid_prime(z):
     return sig * (1 - sig)
 
 class Network(object):
-
     reg_methods = {'L1': Regularization.L1, 'L2': Regularization.L2, 'None': Regularization.none}
     cost_functions = {'cross-entropy': CrossEntropy.output_error, 'mse': QuadraticError.output_error}
 
@@ -44,14 +43,6 @@ class Network(object):
 
         self.weights = np.array(self.weights)
         self.bias = np.array(self.bias)
-
-    def save(self, filename):
-        """Save the neural network to the file ‘‘filename‘‘."""
-        data = {"weights": [w.tolist() for w in self.weights], "biases": [b.tolist() for b in self.bias]}
-        f = open(filename , "w")
-        json.dump(data, f)
-        f.close()
-
 
     def predict(self, x):
         output_activation = self.feedforward(x, is_prediction = True)
@@ -171,6 +162,7 @@ class Network(object):
         self.class_map = class_map
         self.inverse_map = inverse_map
 
+# Example Usage of The Network Class
 n = Network([784,100,10])
 (X_train, y_train), (X_test, y_test) = keras.datasets.mnist.load_data()
 X_train = list(map(lambda x: x.reshape((784,)), X_train))
