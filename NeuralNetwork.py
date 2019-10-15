@@ -6,9 +6,10 @@ import sys
 
 from keras.utils import np_utils
 from sklearn.preprocessing import scale
-from Regularization import Regularization
+
 from Costs import CrossEntropy
 from Costs import QuadraticError
+from Regularization import Regularization
 
 def sigmoid(z):
     return 1 / (1 + np.exp(-z))
@@ -19,7 +20,7 @@ def sigmoid_prime(z):
 
 class Network(object):
     reg_methods = {'L1': Regularization.L1, 'L2': Regularization.L2, 'None': Regularization.none}
-    cost_functions = {'cross-entropy': CrossEntropy.output_error, 'mse': QuadraticError.output_error}
+    cost_functions = {'cross-entropy': Costs.CrossEntropy.output_error, 'mse': Costs.QuadraticError.output_error}
 
     def __init__(self, layers):
         self.num_layers = len(layers)
@@ -56,6 +57,7 @@ class Network(object):
         preds_train = [1 if (self.predict(X_train[i])[0] == y_train[i]) else 0 for i in range(train_size)]
         val_accuracy = round(sum(preds_val) / val_size * 100, 2)
         train_accuracy = round(sum(preds_train) / train_size * 100, 2)
+        print(val_accuracy, train_accuracy)
         return "Validation Accuracy: {}%, Training Accuracy: {}%".format(val_accuracy, train_accuracy)
 
     def train(self, X_train, y_train, X_validate = None, y_validate = None,
@@ -163,14 +165,14 @@ class Network(object):
         self.inverse_map = inverse_map
 
 # Example Usage of The Network Class
-n = Network([784,100,10])
-(X_train, y_train), (X_test, y_test) = keras.datasets.mnist.load_data()
-X_train = list(map(lambda x: x.reshape((784,)), X_train))
-X_train = scale(X_train)
-
-X_test = list(map(lambda x: x.reshape((784,)), X_test))
-X_test = scale(X_test)
-
-n.train(X_train, y_train, X_validate = X_test, y_validate = y_test,
- batch_size = 10, epochs = 10, lr = 0.25, cost_function = 'cross-entropy',
-  regularizaton_method = 'L2', lmbda = 0.1)
+# n = Network([784,100,10])
+# (X_train, y_train), (X_test, y_test) = keras.datasets.mnist.load_data()
+# X_train = list(map(lambda x: x.reshape((784,)), X_train))
+# X_train = scale(X_train)
+# 
+# X_test = list(map(lambda x: x.reshape((784,)), X_test))
+# X_test = scale(X_test)
+#
+# n.train(X_train, y_train, X_validate = X_test, y_validate = y_test,
+#  batch_size = 10, epochs = 10, lr = 0.25, cost_function = 'cross-entropy',
+#   regularizaton_method = 'L2', lmbda = 0.1)
