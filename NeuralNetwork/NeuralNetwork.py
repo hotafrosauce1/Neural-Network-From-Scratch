@@ -1,15 +1,12 @@
 import numpy as np
 import keras
-import json
 import random
-import sys
 
 from keras.utils import np_utils
 from sklearn.preprocessing import scale
 
-from Costs import CrossEntropy
-from Costs import QuadraticError
-from Regularization import Regularization
+from Custom_Neural_Network.Cost import Costs
+from Custom_Neural_Network.Regularization import Regularization
 
 def sigmoid(z):
     return 1 / (1 + np.exp(-z))
@@ -169,7 +166,7 @@ class Network(object):
 # (X_train, y_train), (X_test, y_test) = keras.datasets.mnist.load_data()
 # X_train = list(map(lambda x: x.reshape((784,)), X_train))
 # X_train = scale(X_train)
-# 
+#
 # X_test = list(map(lambda x: x.reshape((784,)), X_test))
 # X_test = scale(X_test)
 #

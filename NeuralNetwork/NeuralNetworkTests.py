@@ -1,4 +1,4 @@
-import NeuralNetwork
+from Custom_Neural_Network.NeuralNetwork import NeuralNetwork
 import numpy as np
 
 class NeuralNetworkTest:
