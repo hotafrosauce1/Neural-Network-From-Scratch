@@ -1,6 +1,6 @@
 # Neural-Network-From-Scratch
  Example Usage of The Network Class
- ```
+ ```python
  n = Network([784,100,10])
  
  (X_train, y_train), (X_test, y_test) = keras.datasets.mnist.load_data()
