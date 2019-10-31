@@ -4,6 +4,7 @@
  n = Network([784,100,10])
  
  (X_train, y_train), (X_test, y_test) = keras.datasets.mnist.load_data()
+ 
  X_train = list(map(lambda x: x.reshape((784,)), X_train))
  X_train = scale(X_train)
 
